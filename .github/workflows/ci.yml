@@ -71,6 +71,13 @@ jobs:
       - run: npm run test:e2e
         env:
           E2E_DATABASE_URL: postgres://signudoc:signudoc@127.0.0.1:5432/signudoc_e2e
+      - name: Verify Mancebo sign-in and isolated drafts
+        run: |
+          export MANCEBO_SIGNING_BRIDGE_SECRET="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("base64url"))')"
+          npm run test:e2e -- e2e/mancebo-signing.spec.ts
+        env:
+          E2E_DATABASE_URL: postgres://signudoc:signudoc@127.0.0.1:5432/signudoc_e2e
+          MANCEBO_SIGNING_TENANT_ID: a0000000-0000-4000-8000-000000000001
       - uses: actions/upload-artifact@v6
         if: failure()
         with:

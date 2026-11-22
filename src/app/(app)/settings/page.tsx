@@ -4,6 +4,7 @@ import { UpdatesPanel } from "@/components/settings/updates-panel";
 import { isAdminUser } from "@/lib/auth/admin";
 import { accountClosureBlock } from "@/lib/account";
 import { getAuthSession } from "@/lib/auth/server";
+import { readManceboSigningConfig } from "@/lib/auth/mancebo-handoff";
 import { toOrganizationSettingsView } from "@/lib/organization-settings";
 import {
   getSettings,
@@ -25,6 +26,7 @@ export default async function SettingsPage() {
     <div className="space-y-8">
       <SettingsShell
         closureBlockedReason={closureBlockedReason}
+        managedSignIn={Boolean(readManceboSigningConfig())}
         initialProfile={{
           email: session?.user.email ?? "",
           fullName: session?.user.name ?? "",

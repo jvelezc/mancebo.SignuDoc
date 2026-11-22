@@ -8,6 +8,11 @@ import { after } from "next/server";
 import type { Pool } from "pg";
 import { cache } from "react";
 
+import {
+  readManceboSigningConfig,
+  signingSessionSeconds,
+} from "./mancebo-handoff.ts";
+import { manceboSigningPlugin } from "./mancebo-plugin.ts";
 import { type Branding } from "../branding.ts";
 import { getDb } from "../db/connection.ts";
 import {
@@ -293,9 +298,12 @@ export function createAppAuth({
 
     return cachedEmailService;
   };
-  const sso = readSsoConfig(env);
+  const signing = readManceboSigningConfig(env);
+  const managedSigning = Boolean(signing);
+  const sso = managedSigning ? null : readSsoConfig(env);
   const passwordPolicy = readPasswordSignInPolicy(env);
   const plugins = [
+    manceboSigningPlugin(database, signing?.tenantId),
     // Single sign-on with the organization's identity provider (sso.ts).
     // Its sign-ins do not ask for this app's second step: the provider's
     // own sign-in, with its own MFA, is the check.
@@ -367,6 +375,9 @@ export function createAppAuth({
       return Array.from(trustedOrigins);
     },
     advanced: {
+      ...(signing
+        ? { cookiePrefix: "mancebo-signing-" + signing.tenantId }
+        : {}),
       // The tables are made by this app's own migrations (db/migrations),
       // and the setup page already says so when they are missing. Better
       // Auth's check would add nothing but a failure it remembers for the
@@ -407,7 +418,7 @@ export function createAppAuth({
       },
     },
     emailAndPassword: {
-      enabled: true,
+      enabled: !managedSigning,
       maxPasswordLength: 128,
       minPasswordLength: 15,
       requireEmailVerification: true,
@@ -510,18 +521,17 @@ export function createAppAuth({
         },
       },
     },
-    session: {
-      cookieCache: {
-        enabled: true,
-        maxAge: 5 * 60,
-      },
-      deferSessionRefresh: true,
-    },
+    session: managedSigning
+      ? { expiresIn: signingSessionSeconds, disableSessionRefresh: true }
+      : {
+          cookieCache: { enabled: true, maxAge: 5 * 60 },
+          deferSessionRefresh: true,
+        },
     plugins,
     secret,
     user: {
       changeEmail: {
-        enabled: true,
+        enabled: !managedSigning,
         sendChangeEmailConfirmation: async ({ newEmail, url, user }) => {
           sendAuthEmailInBackground({
             buildContent: (branding) =>
