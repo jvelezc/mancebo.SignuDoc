@@ -599,6 +599,10 @@ function SendConfirmationDialog({
                       : `The first signer (${firstSignerName}) will be notified immediately.`}{" "}
                   The request expires in {deadlineDays} days.
                 </p>
+                <p>
+                  Once everyone signs, you and the recipients receive the signed
+                  PDF and a link to the original upload.
+                </p>
                 {signatureType ? (
                   <p>
                     Signature type: {signatureType}. It cannot be changed once

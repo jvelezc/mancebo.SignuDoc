@@ -24,7 +24,7 @@ export async function sendFreshDownloadLinks(
 
   return renewRecipientDownloadLinks(token, {
     database,
-    async sendLinks({ envelope, evidenceUrl, signedUrl, signer }) {
+    async sendLinks({ envelope, evidenceUrl, originalUrl, signedUrl, signer }) {
       const subject = `New download links for "${envelope.title}"`;
       const textBody = [
         `Hi ${signer.name},`,
@@ -32,6 +32,7 @@ export async function sendFreshDownloadLinks(
         `Here are new download links for "${envelope.title}" in ${branding.productName}. They work for ${String(TTL_DAYS)} days.`,
         "",
         ...(signedUrl ? [`Signed PDF: ${signedUrl}`] : []),
+        ...(originalUrl ? [`Original PDF: ${originalUrl}`] : []),
         `Certificate: ${evidenceUrl}`,
         "",
         "Download and keep the files: they are your copy of the record.",
@@ -42,6 +43,9 @@ export async function sendFreshDownloadLinks(
         "<p>",
         signedUrl
           ? `<a href="${escapeHtml(signedUrl)}">Download signed PDF</a><br />`
+          : "",
+        originalUrl
+          ? `<a href="${escapeHtml(originalUrl)}">Download original PDF</a><br />`
           : "",
         `<a href="${escapeHtml(evidenceUrl)}">Download certificate</a></p>`,
         "<p>Download and keep the files: they are your copy of the record.</p>",

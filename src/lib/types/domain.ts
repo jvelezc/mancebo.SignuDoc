@@ -110,7 +110,7 @@ export const signatureMeanings = [
 
 export const auditActorTypes = ["sender", "signer", "system"] as const;
 
-export const downloadFileTypes = ["signed", "evidence"] as const;
+export const downloadFileTypes = ["signed", "evidence", "original"] as const;
 
 export const emailTemplateKinds = [
   "account_closure_request",

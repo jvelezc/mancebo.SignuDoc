@@ -393,6 +393,14 @@ function buildCompletionSenderEmail(input: {
   senderName: string;
 }) {
   const completedUrl = getEnvelopeUrl(input.envelopeId);
+  const originalUrl = new URL(
+    `/api/envelopes/${input.envelopeId}/download?type=original`,
+    completedUrl,
+  ).toString();
+  const signedUrl = new URL(
+    `/api/envelopes/${input.envelopeId}/download?type=signed`,
+    completedUrl,
+  ).toString();
   const subject = `"${input.envelopeTitle}" is fully signed`;
   const textBody = [
     `Hi ${input.senderName},`,
@@ -402,12 +410,16 @@ function buildCompletionSenderEmail(input: {
     "",
     "Review the completed envelope:",
     completedUrl,
+    `Signed PDF: ${signedUrl}`,
+    `Original PDF: ${originalUrl}`,
   ].join("\n");
   const htmlBody = [
     `<p>Hi ${escapeHtml(input.senderName)},</p>`,
     `<p>&ldquo;${escapeHtml(input.envelopeTitle)}&rdquo; has been fully signed in ${escapeHtml(input.branding.productName)}.</p>`,
     "<p>The final signed PDF and certificate are ready in your dashboard.</p>",
     `<p><a href="${escapeHtml(completedUrl)}">Review the completed envelope</a></p>`,
+    `<p><a href="${escapeHtml(signedUrl)}">Download signed PDF</a></p>`,
+    `<p><a href="${escapeHtml(originalUrl)}">Download original PDF</a></p>`,
   ].join("");
   const legalFooter = withUserEmailLegalFooter(
     {
@@ -490,6 +502,7 @@ function buildCompletionSignerEmail(input: {
   signerEmail: string;
   signerName: string;
   signedDownloadUrl: string;
+  originalDownloadUrl: string;
 }) {
   const subject = `"${input.envelopeTitle}" is fully signed`;
   const textBody = [
@@ -505,6 +518,7 @@ function buildCompletionSignerEmail(input: {
     "",
     `Download links (available for ${RECIPIENT_DOWNLOAD_LINK_TTL_DAYS} days; an expired link offers to send a new one):`,
     `Signed PDF: ${input.signedDownloadUrl}`,
+    `Original PDF: ${input.originalDownloadUrl}`,
     `Redacted certificate: ${input.evidenceDownloadUrl}`,
   ].join("\n");
   const htmlBody = [
@@ -518,6 +532,7 @@ function buildCompletionSignerEmail(input: {
       : "<p>The completed document and its certificate are ready.</p>",
     `<p>Download links are available for ${RECIPIENT_DOWNLOAD_LINK_TTL_DAYS} days. An expired link offers to send a new one.</p>`,
     `<p><a href="${escapeHtml(input.signedDownloadUrl)}">Download signed PDF</a><br /><a href="${escapeHtml(input.evidenceDownloadUrl)}">Download redacted certificate</a></p>`,
+    `<p><a href="${escapeHtml(input.originalDownloadUrl)}">Download original PDF</a></p>`,
   ].join("");
   const legalFooter = withUserEmailLegalFooter(
     {
@@ -1253,31 +1268,41 @@ async function sendCompletionEmails(input: {
         );
       }
 
-      const [signedLink, redactedEvidenceLink] = await Promise.all([
-        createRecipientDownloadLink(
-          {
-            envelopeId: input.envelopeId,
-            fileType: "signed",
-            issuedAt,
-            signerId: signer.id,
-          },
-          {
-            database: input.database,
-          },
-        ),
-        // Recipient certificate downloads resolve to the redacted certificate PDF.
-        createRecipientDownloadLink(
-          {
-            envelopeId: input.envelopeId,
-            fileType: "evidence",
-            issuedAt,
-            signerId: signer.id,
-          },
-          {
-            database: input.database,
-          },
-        ),
-      ]);
+      const [signedLink, redactedEvidenceLink, originalLink] =
+        await Promise.all([
+          createRecipientDownloadLink(
+            {
+              envelopeId: input.envelopeId,
+              fileType: "signed",
+              issuedAt,
+              signerId: signer.id,
+            },
+            {
+              database: input.database,
+            },
+          ),
+          // Recipient certificate downloads resolve to the redacted certificate PDF.
+          createRecipientDownloadLink(
+            {
+              envelopeId: input.envelopeId,
+              fileType: "evidence",
+              issuedAt,
+              signerId: signer.id,
+            },
+            {
+              database: input.database,
+            },
+          ),
+          createRecipientDownloadLink(
+            {
+              envelopeId: input.envelopeId,
+              fileType: "original",
+              issuedAt,
+              signerId: signer.id,
+            },
+            { database: input.database },
+          ),
+        ]);
 
       return {
         message: {
@@ -1288,6 +1313,7 @@ async function sendCompletionEmails(input: {
             envelopeId: input.envelopeId,
             envelopeTitle: input.envelopeTitle,
             evidenceDownloadUrl: redactedEvidenceLink.url,
+            originalDownloadUrl: originalLink.url,
             senderName,
             signedDownloadUrl: signedLink.url,
             signerEmail: signer.email,
@@ -1301,13 +1327,16 @@ async function sendCompletionEmails(input: {
   );
   const messages = [
     {
-      message: buildCompletionSenderEmail({
-        branding,
-        envelopeId: input.envelopeId,
-        envelopeTitle: input.envelopeTitle,
-        senderEmail: input.sender.email,
-        senderName,
-      }),
+      message: {
+        ...buildCompletionSenderEmail({
+          branding,
+          envelopeId: input.envelopeId,
+          envelopeTitle: input.envelopeTitle,
+          senderEmail: input.sender.email,
+          senderName,
+        }),
+        ...(attach ? { attachments: attachments.slice(0, 1) } : {}),
+      },
       signerId: null,
     },
     ...signerMessages,

@@ -778,6 +778,7 @@ export async function getSenderEnvelopeDownload(
   if (parsedFileType === "signed") {
     return buildSignedPdfDownload(envelope, database, storageService);
   }
+  if (parsedFileType === "original") return buildOriginalPdfDownload(envelope);
 
   return buildCertificateDownload(envelope, database, storageService);
 }
@@ -835,10 +836,29 @@ export async function getPublicEnvelopeDownloadForToken(
   if (fileType === "signed") {
     return buildSignedPdfDownload(envelope, database, storageService);
   }
+  if (fileType === "original") return buildOriginalPdfDownload(envelope);
 
   return buildCertificateDownload(envelope, database, storageService, {
     redactForRecipients: true,
   });
+}
+
+function buildOriginalPdfDownload(
+  envelope: EnvelopeRecord,
+): EnvelopeDownloadResult {
+  if (envelope.status !== "completed") {
+    throw new DownloadAccessError(
+      "The original PDF is available here after everyone signs.",
+      409,
+    );
+  }
+  return {
+    contentType: "application/pdf",
+    envelopeId: envelope.id,
+    fileName: envelope.sourcePdfFilename,
+    fileType: "original",
+    key: envelope.sourcePdfKey,
+  };
 }
 
 export type RenewedDownloadLinks = {
@@ -882,6 +902,7 @@ async function replaceRecipientDownloadLinks(
   tx: DbExecutor,
 ): Promise<{
   evidenceLink: IssuedDownloadLink;
+  originalLink: IssuedDownloadLink | null;
   previousTokens: StoredDownloadToken[];
   signedLink: IssuedDownloadLink | null;
 }> {
@@ -934,7 +955,15 @@ async function replaceRecipientDownloadLinks(
     { database: tx },
   );
 
-  return { evidenceLink, previousTokens, signedLink };
+  const originalLink =
+    envelope.status === "completed" &&
+    previousTokens.some((row) => row.fileType === "original")
+      ? await createRecipientDownloadLink(
+          { envelopeId: envelope.id, fileType: "original", issuedAt, signerId },
+          { database: tx },
+        )
+      : null;
+  return { evidenceLink, originalLink, previousTokens, signedLink };
 }
 
 /**
@@ -952,6 +981,7 @@ export async function renewRecipientDownloadLinks(
     sendLinks: (input: {
       envelope: EnvelopeRecord;
       evidenceUrl: string;
+      originalUrl: string | null;
       signedUrl: string | null;
       signer: SignerRecord;
     }) => Promise<void>;
@@ -993,7 +1023,9 @@ export async function renewRecipientDownloadLinks(
   // The new links are stored in a transaction of their own, which ends
   // before the email is sent: a database connection is not held while the
   // mail provider answers.
-  const { evidenceLink, previousTokens, signedLink } = isPool(database)
+  const { evidenceLink, originalLink, previousTokens, signedLink } = isPool(
+    database,
+  )
     ? await withTransaction(replaceLinks, database)
     : await replaceLinks(database);
 
@@ -1001,12 +1033,16 @@ export async function renewRecipientDownloadLinks(
     await sendLinks({
       envelope,
       evidenceUrl: evidenceLink.url,
+      originalUrl: originalLink?.url ?? null,
       signedUrl: signedLink?.url ?? null,
       signer,
     });
   } catch (error) {
     const issuedHashes = new Map<string, string>([
       ["evidence", evidenceLink.tokenHash],
+      ...(originalLink
+        ? [["original", originalLink.tokenHash] as [string, string]]
+        : []),
       ...(signedLink
         ? [["signed", signedLink.tokenHash] as [string, string]]
         : []),

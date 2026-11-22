@@ -23,6 +23,13 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Check the .NET signing field worker
+        run: |
+          dotnet build dotnet/Mancebo.Signing.Fields/Mancebo.Signing.Fields.csproj
+          node --test dotnet/field-detector.test.mjs
       - run: npm run typecheck
       - run: npm run lint
       # Poppler's pdfsig, so the seal tests check signatures the way a PDF
