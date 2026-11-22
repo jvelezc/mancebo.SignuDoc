@@ -1,4 +1,5 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import pg from "pg";
 
 import { e2eDatabaseUrl } from "../playwright.config";
@@ -117,9 +118,8 @@ test("a Mancebo account opens signing, uploads a document and keeps the draft pr
       page.waitForEvent("filechooser", { timeout: 20_000 }),
       page.getByRole("button", { name: "Document upload dropzone" }).click(),
     ]);
-    await chooser.setFiles(
-      await writeSamplePdf(info.outputPath("agreement.pdf")),
-    );
+    const pdfPath = await writeSamplePdf(info.outputPath("agreement.pdf"));
+    await chooser.setFiles(pdfPath);
     await expect(
       page.getByText("agreement.pdf", { exact: true }),
     ).toBeVisible();
@@ -127,6 +127,10 @@ test("a Mancebo account opens signing, uploads a document and keeps the draft pr
     await page.getByRole("button", { name: "Next ->" }).click();
     await expect(page).toHaveURL(/\/envelopes\/[^/]+\/signers$/);
     const draftPath = new URL(page.url()).pathname;
+    const documentPath = "/api" + draftPath.replace(/\/signers$/, "/document");
+    const ownPdf = await page.request.get(signing.origin + documentPath);
+    expect(ownPdf.status()).toBe(200);
+    expect(await ownPdf.body()).toEqual(await readFile(pdfPath));
     const other = await browser.newContext({ baseURL });
     try {
       const next = await issue(request, second, "documents");
@@ -139,7 +143,13 @@ test("a Mancebo account opens signing, uploads a document and keeps the draft pr
       const secondPage = await other.newPage();
       await secondPage.goto("/dashboard");
       await expect(secondPage).toHaveURL(/\/dashboard$/);
-      expect((await secondPage.goto(draftPath))?.status()).toBe(404);
+      await secondPage.goto(draftPath);
+      await expect(secondPage.getByLabel("Signer 1 name")).toHaveCount(0);
+      await expect(
+        secondPage.getByText("Private test agreement", { exact: true }),
+      ).toHaveCount(0);
+      const privatePdf = await other.request.get(documentPath);
+      expect(privatePdf.status()).toBe(404);
     } finally {
       await other.close();
     }
