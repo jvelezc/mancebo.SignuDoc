@@ -1,4 +1,9 @@
 import { LoginShell } from "@/components/auth/login-shell";
+import { redirect } from "next/navigation";
+import {
+  manceboDocuments,
+  readManceboSigningConfig,
+} from "@/lib/auth/mancebo-handoff";
 import { redirectIfSignedIn } from "@/lib/auth/server";
 import { readPasswordSignInPolicy, readSsoConfig } from "@/lib/auth/sso";
 
@@ -10,6 +15,10 @@ type LoginPageProps = {
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
+  if (readManceboSigningConfig()) {
+    await redirectIfSignedIn();
+    redirect(manceboDocuments);
+  }
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
 
   // A link from a password reset email is for this page whoever is signed

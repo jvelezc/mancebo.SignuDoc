@@ -25,6 +25,7 @@ type AppShellProps = {
   children: ReactNode;
   /** Shown to the administrator until email can reach signers. */
   showEmailSetupNotice?: boolean;
+  workspaceHome?: string;
   user: {
     email: string;
     name: string;
@@ -37,6 +38,7 @@ type ShellSection =
 export function AppShell({
   children,
   showEmailSetupNotice = false,
+  workspaceHome,
   user,
 }: AppShellProps) {
   const pathname = usePathname() ?? "/dashboard";
@@ -55,7 +57,8 @@ export function AppShell({
     const result = await authClient.signOut({
       fetchOptions: {
         onSuccess: () => {
-          router.replace("/login");
+          if (workspaceHome) window.location.assign(workspaceHome);
+          else router.replace("/login");
         },
       },
     });
@@ -70,7 +73,7 @@ export function AppShell({
       <header className="sticky top-0 z-30 bg-[rgba(243,244,248,0.86)] backdrop-blur-md">
         <div className="page-width flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 sm:py-4">
           <div className="flex min-w-0 items-center gap-7">
-            <Brand href="/" />
+            <Brand href={workspaceHome ? "/dashboard" : "/"} />
             <nav
               aria-label="Workspace"
               className="hidden items-center gap-1 md:flex"
@@ -105,6 +108,11 @@ export function AppShell({
                 </p>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {workspaceHome && (
+                <DropdownMenuItem asChild>
+                  <a href={workspaceHome}>Back to Mancebo</a>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem asChild>
                 <Link href="/settings">Settings</Link>
               </DropdownMenuItem>

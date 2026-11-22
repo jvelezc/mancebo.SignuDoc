@@ -21,6 +21,7 @@ const CLOSURE_CONFIRMATION_PHRASE = "close my account";
 const GENERIC_ERROR_MESSAGE = "Something went wrong. Please try again.";
 
 type SettingsShellProps = {
+  managedSignIn?: boolean;
   /** Why this account cannot be closed; shown in place of the button. */
   closureBlockedReason?: string | null;
   initialProfile?: ProfileValues;
@@ -166,6 +167,7 @@ function isNoOpEmailChangeMessage(message: string) {
 export function SettingsShell({
   closureBlockedReason = null,
   initialProfile = defaultProfileValues,
+  managedSignIn = false,
   twoFactor = { enabled: false, required: false },
 }: SettingsShellProps) {
   const closureCopy = useClosureCopy();
@@ -559,7 +561,11 @@ export function SettingsShell({
   return (
     <div className="space-y-5">
       <PageHeader
-        description="Manage your sender profile, password, two-step sign-in and account lifecycle."
+        description={
+          managedSignIn
+            ? "Manage your sender profile and signing sessions."
+            : "Manage your sender profile, password, two-step sign-in and account lifecycle."
+        }
         title="Settings"
       />
 
@@ -587,14 +593,15 @@ export function SettingsShell({
                   label="Email"
                   name="email"
                   onChange={handleProfileChange("email")}
-                  readOnly={false}
+                  readOnly={managedSignIn}
                   type="email"
                   value={profileValues.email}
                 />
               </div>
               <p className="text-sm leading-6 text-(--secondary)">
-                Email changes are verified through your current inbox first,
-                then the new inbox.
+                {managedSignIn
+                  ? "Manage your email and sign-in in your Mancebo account."
+                  : "Email changes are verified through your current inbox first, then the new inbox."}
               </p>
 
               <ShellButton
@@ -607,66 +614,70 @@ export function SettingsShell({
             </form>
           </div>
 
-          <div className="panel p-6 sm:p-8">
-            <div className="space-y-5">
-              <SectionHeading title="Password" />
+          {!managedSignIn && (
+            <>
+              <div className="panel p-6 sm:p-8">
+                <div className="space-y-5">
+                  <SectionHeading title="Password" />
 
-              <form className="space-y-5" onSubmit={handlePasswordSubmit}>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <FieldShell
-                    disabled={isBusy}
-                    error={passwordErrors.currentPassword}
-                    label="Current password"
-                    name="currentPassword"
-                    onChange={handlePasswordChange("currentPassword")}
-                    placeholder="••••••••••"
-                    readOnly={false}
-                    type="password"
-                    value={passwordValues.currentPassword}
-                  />
-                  <FieldShell
-                    disabled={isBusy}
-                    error={passwordErrors.newPassword}
-                    helper="Must be at least 15 characters"
-                    label="New password"
-                    name="newPassword"
-                    onChange={handlePasswordChange("newPassword")}
-                    placeholder="•••••••••••••••"
-                    readOnly={false}
-                    type="password"
-                    value={passwordValues.newPassword}
-                  />
+                  <form className="space-y-5" onSubmit={handlePasswordSubmit}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <FieldShell
+                        disabled={isBusy}
+                        error={passwordErrors.currentPassword}
+                        label="Current password"
+                        name="currentPassword"
+                        onChange={handlePasswordChange("currentPassword")}
+                        placeholder="••••••••••"
+                        readOnly={false}
+                        type="password"
+                        value={passwordValues.currentPassword}
+                      />
+                      <FieldShell
+                        disabled={isBusy}
+                        error={passwordErrors.newPassword}
+                        helper="Must be at least 15 characters"
+                        label="New password"
+                        name="newPassword"
+                        onChange={handlePasswordChange("newPassword")}
+                        placeholder="•••••••••••••••"
+                        readOnly={false}
+                        type="password"
+                        value={passwordValues.newPassword}
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                      <ShellButton
+                        className="w-fit"
+                        loading={pendingAction === "password"}
+                        type="submit"
+                      >
+                        {pendingAction === "password"
+                          ? "Updating..."
+                          : "Update password"}
+                      </ShellButton>
+                      <ShellButton
+                        disabled={isBusy}
+                        loading={pendingAction === "reset"}
+                        onClick={handleResetPasswordLink}
+                        variant="secondary"
+                      >
+                        {pendingAction === "reset"
+                          ? "Sending..."
+                          : "Email me a reset link"}
+                      </ShellButton>
+                    </div>
+                  </form>
                 </div>
+              </div>
 
-                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-                  <ShellButton
-                    className="w-fit"
-                    loading={pendingAction === "password"}
-                    type="submit"
-                  >
-                    {pendingAction === "password"
-                      ? "Updating..."
-                      : "Update password"}
-                  </ShellButton>
-                  <ShellButton
-                    disabled={isBusy}
-                    loading={pendingAction === "reset"}
-                    onClick={handleResetPasswordLink}
-                    variant="secondary"
-                  >
-                    {pendingAction === "reset"
-                      ? "Sending..."
-                      : "Email me a reset link"}
-                  </ShellButton>
-                </div>
-              </form>
-            </div>
-          </div>
-
-          <TwoFactorPanel
-            enabled={twoFactor.enabled}
-            required={twoFactor.required}
-          />
+              <TwoFactorPanel
+                enabled={twoFactor.enabled}
+                required={twoFactor.required}
+              />
+            </>
+          )}
 
           <SessionsPanel />
 

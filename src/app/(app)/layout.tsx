@@ -6,6 +6,10 @@ import { AppShell } from "@/components/layout/app-shell";
 import { BrandingProvider } from "@/components/layout/branding-provider";
 import { isAdminUser } from "@/lib/auth/admin";
 import { getAuthSession } from "@/lib/auth/server";
+import {
+  manceboDocuments,
+  readManceboSigningConfig,
+} from "@/lib/auth/mancebo-handoff";
 import { buildBranding } from "@/lib/branding";
 import { emailNeedsAttention } from "@/lib/email-status";
 import { getInstallMetadata } from "@/lib/install";
@@ -41,6 +45,9 @@ export default async function AuthenticatedAppLayout({
   return (
     <BrandingProvider branding={buildBranding(settings)}>
       <AppShell
+        workspaceHome={
+          readManceboSigningConfig() ? manceboDocuments : undefined
+        }
         // Only the administrator can do anything about email, so only the
         // administrator is told when it still needs setting up.
         showEmailSetupNotice={isAdmin && emailNeedsAttention(settings)}

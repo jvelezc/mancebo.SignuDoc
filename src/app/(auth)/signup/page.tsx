@@ -1,4 +1,9 @@
 import { SignupShell } from "@/components/auth/signup-shell";
+import { redirect } from "next/navigation";
+import {
+  manceboDocuments,
+  readManceboSigningConfig,
+} from "@/lib/auth/mancebo-handoff";
 import { redirectIfSignedIn } from "@/lib/auth/server";
 import { readPasswordSignInPolicy, readSsoConfig } from "@/lib/auth/sso";
 import { buildBranding } from "@/lib/branding";
@@ -8,6 +13,7 @@ import { describeSignupPolicy } from "@/lib/signup-policy";
 
 export default async function SignupPage() {
   await redirectIfSignedIn();
+  if (readManceboSigningConfig()) redirect(manceboDocuments);
 
   const settings = await getSettings();
   const sso = readSsoConfig();
