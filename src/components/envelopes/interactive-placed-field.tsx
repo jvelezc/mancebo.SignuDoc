@@ -199,6 +199,21 @@ export function InteractivePlacedField({
   }
 
   function handleKeyboardSelect(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.target !== event.currentTarget) return;
+    const offsets: Record<string, readonly [number, number]> = {
+      ArrowLeft: [-1, 0],
+      ArrowRight: [1, 0],
+      ArrowUp: [0, -1],
+      ArrowDown: [0, 1],
+    };
+    const offset = offsets[event.key];
+    if (offset) {
+      event.preventDefault();
+      onSelect();
+      const step = (event.shiftKey ? 0.025 : 0.005) * coordinateScale;
+      onMove(step * offset[0], step * offset[1]);
+      return;
+    }
     if (event.key !== "Enter" && event.key !== " ") {
       return;
     }
@@ -211,6 +226,7 @@ export function InteractivePlacedField({
     <div
       aria-label={`${signer.name} · ${label}`}
       aria-pressed={isSelected}
+      aria-keyshortcuts="ArrowLeft ArrowRight ArrowUp ArrowDown"
       className={`absolute z-2 flex touch-none select-none items-center justify-center overflow-visible border-2 text-center text-[11px] font-semibold shadow-(--shadow-card) transition ${
         isSelected
           ? "ring-4 ring-[rgba(28,29,43,0.10)]"

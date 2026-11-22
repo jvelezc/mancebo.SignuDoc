@@ -193,6 +193,7 @@ export function buildOpenApiDocument(
             files: {
               properties: {
                 certificate: { type: ["string", "null"] },
+                original: { type: ["string", "null"] },
                 signed: { type: ["string", "null"] },
               },
               type: "object",
@@ -578,6 +579,19 @@ export function buildOpenApiDocument(
           summary: "Get an envelope's audit trail",
         },
       },
+      "/envelopes/{id}/field-suggestions": {
+        get: {
+          parameters: [idParameter],
+          responses: {
+            "200": {
+              description:
+                "Proposed fields for human review in top-left normalized page coordinates.",
+            },
+            ...errors,
+          },
+          summary: "Detect fields in the envelope's original PDF",
+        },
+      },
       "/envelopes/{id}/files/{file}": {
         get: {
           parameters: [
@@ -586,7 +600,10 @@ export function buildOpenApiDocument(
               in: "path",
               name: "file",
               required: true,
-              schema: { enum: ["signed", "certificate"], type: "string" },
+              schema: {
+                enum: ["signed", "original", "certificate"],
+                type: "string",
+              },
             },
           ],
           responses: {
@@ -596,7 +613,8 @@ export function buildOpenApiDocument(
             },
             ...errors,
           },
-          summary: "Download the signed PDF or the certificate of completion",
+          summary:
+            "Download the signed PDF, original PDF or certificate of completion",
         },
       },
       "/envelopes/{id}/remind": {

@@ -51,7 +51,11 @@ export type ApiEnvelope = {
   delivery: "email" | "embedded";
   expired: boolean;
   expiresAt: string | null;
-  files: { certificate: string | null; signed: string | null };
+  files: {
+    certificate: string | null;
+    original: string | null;
+    signed: string | null;
+  };
   id: string;
   metadata: Record<string, unknown> | null;
   object: "envelope";
@@ -202,6 +206,7 @@ export function toApiEnvelope(
     expiresAt: isoTime(row.expiresAt),
     files: {
       certificate: finished ? `${base}/certificate` : null,
+      original: row.status === "completed" ? `${base}/original` : null,
       signed: row.status === "completed" ? `${base}/signed` : null,
     },
     id: row.id,

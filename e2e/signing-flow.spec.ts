@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 import pg from "pg";
 
 import {
@@ -74,6 +75,7 @@ test("a new install is set up, a sender sends a PDF and a recipient signs it", a
   const copyEmail = `copy+${runId}@example.com`;
   const secondSignerEmail = `second+${runId}@example.com`;
   const cspViolations: string[] = [];
+  const sourcePdfPath = testInfo.outputPath("sample.pdf");
   let envelopeId = "";
 
   watchForContentSecurityPolicyViolations(page, cspViolations);
@@ -406,7 +408,7 @@ test("a new install is set up, a sender sends a PDF and a recipient signs it", a
   });
 
   await test.step("upload a PDF", async () => {
-    const pdfPath = await writeSamplePdf(testInfo.outputPath("sample.pdf"));
+    const pdfPath = await writeSamplePdf(sourcePdfPath);
 
     await page.goto("/envelopes/new");
     await page.getByLabel("Envelope title").fill(ENVELOPE_TITLE);
@@ -476,15 +478,52 @@ test("a new install is set up, a sender sends a PDF and a recipient signs it", a
     await expect(
       page.getByRole("img", { name: "Rendered PDF page 1" }),
     ).toBeVisible();
-    await page.getByRole("button", { exact: true, name: "Signature" }).click();
-
-    const placementTarget = page.getByLabel("Place Signature on page 1");
-    const box = await placementTarget.boundingBox();
+    const canvas = page.getByRole("img", { name: "Rendered PDF page 1" });
+    if (process.env.SIGNING_FIELD_SERVICE_URL) {
+      await page
+        .getByRole("button", {
+          name: "Add Signature:, page 1 for Riley Recipient",
+          exact: true,
+        })
+        .click();
+      const field = page.getByRole("button", {
+        name: "Riley Recipient · Sign",
+      });
+      await expect(field).toBeVisible();
+      await field.scrollIntoViewIfNeeded();
+      const start = (await field.boundingBox())!;
+      await page.mouse.move(
+        start.x + start.width / 2,
+        start.y + start.height / 2,
+      );
+      await page.mouse.down();
+      await page.mouse.move(
+        start.x + start.width / 2 + 42,
+        start.y + start.height / 2 - 30,
+        { steps: 6 },
+      );
+      await page.mouse.up();
+      await expect
+        .poll(async () => (await field.boundingBox())?.x)
+        .toBeGreaterThan(start.x + 30);
+      const draggedX = (await field.boundingBox())!.x;
+      await field.press("Shift+ArrowLeft");
+      await expect
+        .poll(async () => (await field.boundingBox())?.x)
+        .toBeLessThan(draggedX);
+    } else {
+      await page
+        .getByRole("button", { exact: true, name: "Signature" })
+        .click();
+      const target = page.getByLabel("Place Signature on page 1");
+      const area = (await target.boundingBox())!;
+      await target.click({
+        position: { x: area.width * 0.3, y: area.height * 0.7 },
+      });
+    }
+    const box = await canvas.boundingBox();
 
     expect(box).not.toBeNull();
-    await placementTarget.click({
-      position: { x: box!.width * 0.3, y: box!.height * 0.7 },
-    });
     await expect(
       page.getByRole("button", { name: "Riley Recipient · Sign" }),
     ).toBeVisible();
@@ -646,7 +685,14 @@ test("a new install is set up, a sender sends a PDF and a recipient signs it", a
       new URL(link).pathname.startsWith("/api/download/"),
     );
 
-    expect(downloadLinks.length).toBeGreaterThanOrEqual(1);
+    expect(downloadLinks).toHaveLength(3);
+    const originalLink = /^Original PDF: (.+)$/m
+      .exec(completionEmail.text)?.[1]
+      ?.trim();
+    expect(originalLink).toBeDefined();
+    const original = await recipientContext.request.get(originalLink!);
+    await expectPdfResponse(original);
+    expect(await original.body()).toEqual(await readFile(sourcePdfPath));
 
     for (const downloadLink of downloadLinks) {
       await expectPdfResponse(await recipientContext.request.get(downloadLink));
@@ -685,17 +731,22 @@ test("a new install is set up, a sender sends a PDF and a recipient signs it", a
   });
 
   await test.step("the sender sees it completed and can download", async () => {
-    await waitForEmail({
+    const senderCompletion = await waitForEmail({
       template: "completion_notification",
       to: senderEmail,
     });
+    expect(
+      senderCompletion.attachments?.some((file) =>
+        file.filename.endsWith(" - signed.pdf"),
+      ),
+    ).toBe(true);
     await page.goto(`/envelopes/${envelopeId}`);
     await expect(page.getByText("Completed", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "Download signed PDF" }),
     ).toBeVisible();
 
-    for (const type of ["signed", "evidence"]) {
+    for (const type of ["signed", "evidence", "original"]) {
       await expectPdfResponse(
         await page.request.get(
           `/api/envelopes/${envelopeId}/download?type=${type}`,

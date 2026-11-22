@@ -1,5 +1,7 @@
 # Self-hosting SignuDoc
 
+For a Mancebo tenant, see [Mancebo document signing](mancebo-signing.md) for the .NET field worker and private Cloudflare R2 setup.
+
 Everything about running your own SignuDoc: deploying it, setting it up, what it costs, keeping it up to date, and the settings you can change. For working on the code, see [Development](development.md).
 
 - [Deploy to Vercel](#deploy-to-vercel)

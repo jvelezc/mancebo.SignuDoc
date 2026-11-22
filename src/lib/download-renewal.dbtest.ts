@@ -249,3 +249,41 @@ test("when the email does not go out the old links are put back, and the signer 
     signed: hashOfLink(sent[0] ?? null),
   });
 });
+
+test("a renewal replaces the original PDF link only when the recipient already had one", async () => {
+  const { envelopeId, signed, signerId } = await createFinishedEnvelope();
+  const original = await createRecipientDownloadLink(
+    {
+      envelopeId,
+      fileType: "original",
+      issuedAt: Math.floor(Date.now() / 1000),
+      signerId,
+    },
+    { database },
+  );
+  await assert.rejects(
+    renewRecipientDownloadLinks(original.token, {
+      database,
+      sendLinks: async () => {
+        throw new Error("captured delivery failure");
+      },
+    }),
+    /captured delivery failure/,
+  );
+  assert.equal(
+    (await storedHashes(envelopeId, signerId)).original,
+    original.tokenHash,
+  );
+
+  let deliveredOriginal: string | null = null;
+  await renewRecipientDownloadLinks(signed.token, {
+    database,
+    sendLinks: async (links) => {
+      deliveredOriginal = links.originalUrl;
+    },
+  });
+  const newHash = (await storedHashes(envelopeId, signerId)).original;
+  assert.ok(deliveredOriginal);
+  assert.equal(newHash, hashOfLink(deliveredOriginal));
+  assert.notEqual(newHash, original.tokenHash);
+});

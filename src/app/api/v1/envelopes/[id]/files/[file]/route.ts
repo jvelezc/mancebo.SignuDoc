@@ -5,7 +5,11 @@ import { getSenderEnvelopeDownload } from "@/lib/downloads";
 
 type Context = { params: Promise<{ file: string; id: string }> };
 
-const FILE_TYPES = { certificate: "evidence", signed: "signed" } as const;
+const FILE_TYPES = {
+  certificate: "evidence",
+  original: "original",
+  signed: "signed",
+} as const;
 
 // The signed PDF (once completed) or the certificate of completion (once
 // completed, declined or voided).
@@ -26,7 +30,7 @@ export async function GET(request: Request, context: Context) {
         return apiError(
           404,
           "not_found",
-          "Ask for files/signed or files/certificate.",
+          "Ask for files/signed, files/original or files/certificate.",
         );
       }
 

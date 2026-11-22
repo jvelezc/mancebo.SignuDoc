@@ -67,6 +67,7 @@ import {
 import { InteractivePlacedField } from "./interactive-placed-field";
 import { PdfPageCanvas } from "./pdf-page-canvas";
 import { getSignerPalette } from "./signer-palette";
+import { SuggestedFields } from "./suggested-fields";
 
 type PrepareFieldType = FieldPlacement["type"];
 
@@ -1117,6 +1118,43 @@ function PrepareLiveShellContent({
             </div>
           </div>
 
+          {selectedSigner && (
+            <SuggestedFields
+              key={envelopeId}
+              envelopeId={envelopeId}
+              signerName={selectedSigner.name}
+              onPlace={({
+                page,
+                type,
+                label,
+                required,
+                x,
+                y,
+                width,
+                height,
+              }) => {
+                const id = window.crypto.randomUUID();
+                setFields((current) => [
+                  ...current,
+                  {
+                    page,
+                    type,
+                    label,
+                    required,
+                    x,
+                    y,
+                    width,
+                    height,
+                    id,
+                    signerId: selectedSigner.id,
+                  },
+                ]);
+                setActivePage(page);
+                setSelectedFieldId(id);
+                setArmedTool(null);
+              }}
+            />
+          )}
           {/* Not a status region: the page has one, for "Saved". */}
           {choiceProblemMessage ? (
             <p aria-live="polite" className="notice notice-warning">
